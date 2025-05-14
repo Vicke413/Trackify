@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { scrapeProduct } from "./scraper";
@@ -11,6 +11,13 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import MemoryStore from "memorystore";
+
+// Extend express-session with custom properties
+declare module 'express-session' {
+  interface SessionData {
+    userId: number;
+  }
+}
 
 // Middleware to check if user is authenticated
 const isAuthenticated = (req: Request, res: Response, next: any) => {
@@ -26,11 +33,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "price-tracker-secret",
-      resave: false,
-      saveUninitialized: false,
+      resave: true,
+      saveUninitialized: true,
       cookie: {
         secure: process.env.NODE_ENV === "production",
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        httpOnly: true,
+        sameSite: "lax"
       },
       store: new SessionStore({
         checkPeriod: 86400000, // prune expired entries every 24h
@@ -77,11 +86,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Set session
       req.session.userId = user.id;
-
-      res.status(201).json({ 
-        id: user.id,
-        username: user.username,
-        email: user.email
+      
+      // Save session before sending response
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ message: "Error saving session" });
+        }
+        
+        res.status(201).json({ 
+          id: user.id,
+          username: user.username,
+          email: user.email
+        });
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -114,11 +131,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Set session
       req.session.userId = user.id;
-
-      res.status(200).json({ 
-        id: user.id,
-        username: user.username,
-        email: user.email
+      
+      // Save session before sending response
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ message: "Error saving session" });
+        }
+        
+        res.status(200).json({ 
+          id: user.id,
+          username: user.username,
+          email: user.email
+        });
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
