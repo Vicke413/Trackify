@@ -60,7 +60,7 @@ export function RegisterForm() {
       navigate("/");
       toast({
         title: "Registration successful!",
-        description: "Welcome to PriceTracker!",
+        description: "Welcome to Trackify!",
       });
     } catch (error) {
       console.error("Registration error:", error);

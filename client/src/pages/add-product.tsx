@@ -93,7 +93,7 @@ export default function AddProduct() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                PriceTracker works with most major e-commerce websites including:
+                Trackify works with most major e-commerce websites including:
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <div className="border rounded-md p-2 text-center text-sm">Amazon</div>
