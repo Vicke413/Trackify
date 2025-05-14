@@ -20,10 +20,14 @@ declare module 'express-session' {
 }
 
 // Middleware to check if user is authenticated
-const isAuthenticated = (req: Request, res: Response, next: any) => {
+const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
+  console.log("Session check:", req.session.id, "User ID:", req.session.userId);
+  
   if (req.session && req.session.userId) {
     return next();
   }
+  
+  console.log("Authentication failed - no session userId");
   res.status(401).json({ message: "Unauthorized" });
 };
 
