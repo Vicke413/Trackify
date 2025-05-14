@@ -9,6 +9,103 @@ export interface ScrapedProduct {
   imageUrl?: string;
 }
 
+// Gemini API for when traditional scraping fails
+const GEMINI_API_KEY = "AIzaSyDn0iT9GoSyP3IRQqB-kYqmjA7btK9SPM0";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+
+interface GeminiRequest {
+  contents: {
+    parts: {
+      text: string;
+    }[];
+  }[];
+}
+
+interface GeminiResponse {
+  candidates: {
+    content: {
+      parts: {
+        text: string;
+      }[];
+    };
+  }[];
+}
+
+async function getProductInfoFromGemini(url: string): Promise<ScrapedProduct | null> {
+  try {
+    console.log("Using Gemini API for product info:", url);
+    
+    const prompt = `
+      Extract product information from this URL: ${url}
+      Return ONLY a JSON object with these fields:
+      {
+        "name": "Full product name",
+        "price": 19.99,
+        "currency": "USD",
+        "imageUrl": "https://example.com/image.jpg"
+      }
+      
+      Notes:
+      - For price, return ONLY a number without currency symbols
+      - For currency, use standard 3-letter currency code (USD, EUR, GBP, INR, etc.)
+      - If you cannot determine a field, use null for imageUrl and "Unknown Product" for name
+      - For price, use 0 if unknown
+    `;
+    
+    const requestBody: GeminiRequest = {
+      contents: [
+        {
+          parts: [
+            { text: prompt }
+          ]
+        }
+      ]
+    };
+    
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      console.error(`Gemini API error: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    
+    const data = await response.json() as GeminiResponse;
+    
+    if (!data.candidates || data.candidates.length === 0) {
+      console.error("No response from Gemini API");
+      return null;
+    }
+    
+    const text = data.candidates[0].content.parts[0].text;
+    console.log("Gemini response:", text);
+    
+    // Extract the JSON object from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("No JSON found in Gemini response");
+      return null;
+    }
+    
+    const productInfo = JSON.parse(jsonMatch[0]);
+    
+    return {
+      name: productInfo.name || "Unknown Product",
+      price: typeof productInfo.price === 'number' ? productInfo.price : 0,
+      currency: productInfo.currency || "USD",
+      imageUrl: productInfo.imageUrl || undefined
+    };
+  } catch (error) {
+    console.error("Error getting product info from Gemini:", error);
+    return null;
+  }
+}
+
 // Handle shortened Amazon URLs
 function expandAmazonUrl(url: string): string {
   // Handle shortened Amazon URLs like amzn.in
@@ -29,42 +126,61 @@ function expandAmazonUrl(url: string): string {
 // Simple scraper that attempts to extract data from common e-commerce sites
 export async function scrapeProduct(url: string): Promise<ScrapedProduct> {
   try {
-    // Expand shortened URLs if necessary
+    // First, try to expand shortened URLs
     const expandedUrl = expandAmazonUrl(url);
     console.log(`Attempting to scrape: ${expandedUrl}`);
     
-    const response = await fetch(expandedUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      },
-      redirect: 'follow'
-    });
+    // Step 1: First try traditional scraping
+    try {
+      const response = await fetch(expandedUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        redirect: 'follow'
+      });
 
-    if (!response.ok) {
-      console.error(`Failed to fetch: ${response.status} ${response.statusText}`);
-      
-      // If we can't scrape, return fallback data with the URL information
-      return {
-        name: `Product from ${new URL(url).hostname}`,
-        price: 0,
-        currency: 'USD',
-        imageUrl: undefined
-      };
+      if (response.ok) {
+        const html = await response.text();
+        const dom = new JSDOM(html);
+        const document = dom.window.document;
+
+        const extractedInfo = extractProductInfo(document, expandedUrl);
+        
+        // If we got meaningful data, return it
+        if (extractedInfo.name !== 'Unknown Product' && extractedInfo.price > 0) {
+          console.log("Successfully extracted product info using traditional scraping:", extractedInfo);
+          return extractedInfo;
+        }
+      } else {
+        console.error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error(`Error in traditional scraping: ${error}`);
     }
-
-    const html = await response.text();
-    const dom = new JSDOM(html);
-    const document = dom.window.document;
-
-    const extractedInfo = extractProductInfo(document, expandedUrl);
-    console.log("Extracted product info:", extractedInfo);
-    return extractedInfo;
+    
+    // Step 2: If traditional scraping failed, use Gemini API
+    console.log("Traditional scraping failed, trying Gemini API...");
+    const geminiResult = await getProductInfoFromGemini(url);
+    
+    if (geminiResult) {
+      console.log("Successfully extracted product info using Gemini API:", geminiResult);
+      return geminiResult;
+    }
+    
+    // Step 3: If both methods failed, return a basic fallback
+    console.log("Both scraping methods failed, using fallback data");
+    return {
+      name: `Product from ${new URL(url).hostname}`,
+      price: 0,
+      currency: 'USD',
+      imageUrl: undefined
+    };
   } catch (error) {
-    console.error(`Error scraping product: ${error}`);
+    console.error(`Error in scraping process: ${error}`);
     
     // Return fallback data rather than throwing
     return {
