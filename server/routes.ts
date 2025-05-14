@@ -210,14 +210,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         url,
         name: scrapedProduct.name,
         imageUrl: scrapedProduct.imageUrl,
-        currentPrice: scrapedProduct.price,
+        currentPrice: scrapedProduct.price.toString(), // Convert to string for numeric field
         currency: scrapedProduct.currency,
       });
 
       // Add initial price history entry
       await storage.addPriceHistory({
         productId: product.id,
-        price: scrapedProduct.price,
+        price: scrapedProduct.price.toString(), // Convert to string for numeric field
       });
 
       res.status(201).json(product);
@@ -307,13 +307,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const scrapedProduct = await scrapeProduct(product.url);
       
       // Update product with new price
-      const updatedProduct = await storage.updateProductPrice(id, scrapedProduct.price);
+      const updatedProduct = await storage.updateProductPrice(id, scrapedProduct.price.toString());
       
       // Add price history entry if price changed
       if (Number(product.currentPrice) !== scrapedProduct.price) {
         await storage.addPriceHistory({
           productId: product.id,
-          price: scrapedProduct.price,
+          price: scrapedProduct.price.toString(), // Convert to string for numeric field
         });
       }
       

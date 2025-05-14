@@ -11,7 +11,7 @@ export interface ScrapedProduct {
 
 // Gemini API for when traditional scraping fails
 const GEMINI_API_KEY = "AIzaSyDn0iT9GoSyP3IRQqB-kYqmjA7btK9SPM0";
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
 
 interface GeminiRequest {
   contents: {
