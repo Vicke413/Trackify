@@ -3,7 +3,6 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
-  DollarSign, 
   LayoutDashboard, 
   History, 
   Bell, 
@@ -13,6 +12,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import logoPath from "../../assets/logo.jpeg";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -40,12 +40,12 @@ export function Sidebar() {
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
         <div className="flex flex-col">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-sidebar-primary rounded-md flex items-center justify-center">
-              <DollarSign className="h-5 w-5 text-white" />
+            <div className="w-10 h-10 rounded-md flex items-center justify-center overflow-hidden">
+              <img src={logoPath} alt="Trackify Logo" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-xl font-bold text-white">Trackify</h1>
           </div>
-          <p className="text-xs text-sidebar-foreground/70 ml-10">Track Smarter, Shop Better</p>
+          <p className="text-xs text-sidebar-foreground/70 ml-12">Track Smarter, Shop Better</p>
         </div>
         <button 
           className="md:hidden text-sidebar-foreground" 
