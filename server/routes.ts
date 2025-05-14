@@ -402,6 +402,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch price alerts" });
     }
   });
+  
+  // Get all alerts for the current user (across all products)
+  app.get("/api/alerts", isAuthenticated, async (req, res) => {
+    try {
+      const alerts = await storage.getAlertsByUserId(req.session.userId!);
+      res.status(200).json(alerts);
+    } catch (error) {
+      console.error("Get user alerts error:", error);
+      res.status(500).json({ message: "Failed to fetch user alerts" });
+    }
+  });
 
   app.put("/api/alerts/:id", isAuthenticated, async (req, res) => {
     try {

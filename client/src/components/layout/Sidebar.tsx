@@ -38,11 +38,14 @@ export function Sidebar() {
   return (
     <aside className="bg-sidebar text-sidebar-foreground w-full md:w-64 md:fixed md:h-full z-10">
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-sidebar-primary rounded-md flex items-center justify-center">
-            <DollarSign className="h-5 w-5 text-white" />
+        <div className="flex flex-col">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-sidebar-primary rounded-md flex items-center justify-center">
+              <DollarSign className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-xl font-bold text-white">Trackify</h1>
           </div>
-          <h1 className="text-xl font-bold text-white">PriceTracker</h1>
+          <p className="text-xs text-sidebar-foreground/70 ml-10">Track Smarter, Shop Better</p>
         </div>
         <button 
           className="md:hidden text-sidebar-foreground" 

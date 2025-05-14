@@ -36,20 +36,25 @@ async function getProductInfoFromGemini(url: string): Promise<ScrapedProduct | n
     console.log("Using Gemini API for product info:", url);
     
     const prompt = `
-      Extract product information from this URL: ${url}
-      Return ONLY a JSON object with these fields:
+      You are a product data extraction expert. Extract EXACT product information from this Amazon URL: ${url}
+      
+      Don't make up information or guess! If you cannot access the actual page, explicitly say so.
+      
+      Return ONLY a valid JSON object with these fields:
       {
-        "name": "Full product name",
+        "name": "Full product name without modifications, exactly as shown on the page",
         "price": 19.99,
-        "currency": "USD",
+        "currency": "INR",
         "imageUrl": "https://example.com/image.jpg"
       }
       
-      Notes:
-      - For price, return ONLY a number without currency symbols
-      - For currency, use standard 3-letter currency code (USD, EUR, GBP, INR, etc.)
+      IMPORTANT INSTRUCTIONS:
+      - For name, extract the EXACT product name as displayed on the Amazon page
+      - For price, return ONLY a number without currency symbols (e.g., 1999 not ₹1,999)
+      - For currency, use the exact currency code from the page (INR for Indian prices, USD for US, etc.)
       - If you cannot determine a field, use null for imageUrl and "Unknown Product" for name
       - For price, use 0 if unknown
+      - DO NOT return a fixed/dummy response
     `;
     
     const requestBody: GeminiRequest = {

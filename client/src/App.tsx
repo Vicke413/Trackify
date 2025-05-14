@@ -9,6 +9,8 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import ProductDetail from "@/pages/product-detail";
 import AddProduct from "@/pages/add-product";
+import PriceHistory from "@/pages/price-history";
+import Alerts from "@/pages/alerts";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
@@ -32,6 +34,16 @@ function Router() {
       <Route path="/add-product">
         <ProtectedRoute>
           <AddProduct />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/price-history">
+        <ProtectedRoute>
+          <PriceHistory />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/alerts">
+        <ProtectedRoute>
+          <Alerts />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
