@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { scrapeProduct } from "./scraper";
+import { sendPriceAlertEmail } from "./email";
 import { 
   insertUserSchema, 
   insertProductSchema, 
@@ -306,15 +307,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Scrape updated product info
       const scrapedProduct = await scrapeProduct(product.url);
       
+      // Get current price before updating
+      const oldPrice = Number(product.currentPrice);
+      const newPrice = scrapedProduct.price;
+      
       // Update product with new price
       const updatedProduct = await storage.updateProductPrice(id, scrapedProduct.price.toString());
       
       // Add price history entry if price changed
-      if (Number(product.currentPrice) !== scrapedProduct.price) {
+      const priceChanged = oldPrice !== newPrice;
+      if (priceChanged) {
         await storage.addPriceHistory({
           productId: product.id,
           price: scrapedProduct.price.toString(), // Convert to string for numeric field
         });
+        
+        // Check for price alerts that should be triggered
+        if (newPrice < oldPrice) {  // Only check alerts if price dropped
+          const user = await storage.getUser(product.userId);
+          if (!user) {
+            console.error("User not found for product:", product.id);
+          } else {
+            // Get all active alerts for this product
+            const alerts = await storage.getAlertsForProduct(product.id);
+            
+            // Check each alert to see if the new price is below the target price
+            for (const alert of alerts) {
+              if (alert.active && newPrice <= Number(alert.targetPrice)) {
+                console.log(`Price alert triggered for product ${product.id}, price: ${newPrice}, target: ${alert.targetPrice}`);
+                
+                // Send email notification
+                try {
+                  const emailSent = await sendPriceAlertEmail(
+                    user.email,
+                    product.name,
+                    newPrice,
+                    alert.targetPrice,
+                    product.currency || "USD",
+                    product.url
+                  );
+                  
+                  if (emailSent) {
+                    console.log(`Price alert email sent to ${user.email} for product ${product.id}`);
+                    
+                    // Optionally deactivate the alert after it's triggered
+                    await storage.updateAlertStatus(alert.id, false);
+                  }
+                } catch (emailError) {
+                  console.error("Error sending price alert email:", emailError);
+                }
+              }
+            }
+          }
+        }
       }
       
       res.status(200).json(updatedProduct);

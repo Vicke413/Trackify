@@ -36,9 +36,14 @@ async function getProductInfoFromGemini(url: string): Promise<ScrapedProduct | n
     console.log("Using Gemini API for product info:", url);
     
     const prompt = `
-      You are a product data extraction expert. Extract EXACT product information from this Amazon URL: ${url}
+      You are a product data extraction expert. Your task is to extract EXACT product information from this specific Amazon URL: ${url}
       
-      Don't make up information or guess! If you cannot access the actual page, explicitly say so.
+      EXTREMELY IMPORTANT: 
+      - Do not guess or make up information
+      - DO NOT respond with a fixed/canned response
+      - Each URL will have different product information
+      - Verify that the information corresponds to the EXACT URL provided
+      - Do not use information from a previous query
       
       Return ONLY a valid JSON object with these fields:
       {
@@ -48,13 +53,21 @@ async function getProductInfoFromGemini(url: string): Promise<ScrapedProduct | n
         "imageUrl": "https://example.com/image.jpg"
       }
       
-      IMPORTANT INSTRUCTIONS:
-      - For name, extract the EXACT product name as displayed on the Amazon page
-      - For price, return ONLY a number without currency symbols (e.g., 1999 not ₹1,999)
-      - For currency, use the exact currency code from the page (INR for Indian prices, USD for US, etc.)
-      - If you cannot determine a field, use null for imageUrl and "Unknown Product" for name
-      - For price, use 0 if unknown
-      - DO NOT return a fixed/dummy response
+      GUIDELINES:
+      - For name: Extract the EXACT product name from the Amazon page title or product details
+      - For price: Return ONLY a number without currency symbols (e.g., 1999 not ₹1,999)
+      - For currency: Use the exact currency code (INR for Indian prices, USD for US prices, etc.)
+      - For imageUrl: Include the full URL to the product image
+      - If you cannot determine a field with 100% certainty, use null for that field
+      - If you cannot access the page at all, return:
+        {
+          "name": "Unknown Product",
+          "price": 0,
+          "currency": "USD",
+          "imageUrl": null
+        }
+      
+      Remember, the user will check the accuracy of your extraction against the actual product page.
     `;
     
     const requestBody: GeminiRequest = {
@@ -111,47 +124,58 @@ async function getProductInfoFromGemini(url: string): Promise<ScrapedProduct | n
   }
 }
 
-// Handle Amazon URLs
+// Handle Amazon URLs - more robust implementation
 function expandAmazonUrl(url: string): string {
   try {
     console.log("Original URL:", url);
     
-    // Direct pass-through for full Amazon URLs
-    if (url.includes('amazon.com')) {
-      console.log("Amazon.com URL detected, using as-is");
-      return url;
+    // Clean the URL first by removing any tracking params
+    const cleanUrl = url.split('?')[0];
+    
+    // Handle different Amazon domains directly
+    if (cleanUrl.includes('amazon.com') || 
+        cleanUrl.includes('amazon.in') ||
+        cleanUrl.includes('amazon.co.uk') ||
+        cleanUrl.includes('amazon.ca')) {
+      console.log("Full Amazon URL detected, using as-is:", cleanUrl);
+      return cleanUrl;
     }
     
-    // For shortened URLs like amzn.in/d/PRODUCTID
-    if (url.includes('amzn.in') || url.includes('amzn.to')) {
+    // For shortened URLs like amzn.in/d/PRODUCTID or amzn.to/xxx
+    if (cleanUrl.includes('amzn.in') || cleanUrl.includes('amzn.to')) {
       let productId = '';
+      let domain = 'amazon.in'; // Default to Indian Amazon for amzn.in
+      
+      if (cleanUrl.includes('amzn.to')) {
+        domain = 'amazon.com'; // Default to US Amazon for amzn.to
+      }
       
       // Pattern like amzn.in/d/abc123
-      if (url.includes('/d/')) {
-        const parts = url.split('/d/');
+      if (cleanUrl.includes('/d/')) {
+        const parts = cleanUrl.split('/d/');
         if (parts.length > 1) {
-          productId = parts[1].split('?')[0].split('/')[0].trim();
+          productId = parts[1].split('/')[0].trim();
           console.log("Extracted product ID from /d/ format:", productId);
         }
       } 
       
       // If we couldn't extract ID using the /d/ pattern, try another approach
       if (!productId) {
-        const urlObj = new URL(url);
-        const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
-        productId = pathParts[pathParts.length - 1].trim();
-        console.log("Extracted product ID using pathname:", productId);
+        try {
+          const urlObj = new URL(cleanUrl);
+          const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
+          productId = pathParts[pathParts.length - 1].trim();
+          console.log("Extracted product ID using pathname:", productId);
+        } catch (e) {
+          console.error("URL parsing error:", e);
+          // Last resort fallback - just use the last part of the URL
+          const parts = cleanUrl.split('/');
+          productId = parts[parts.length - 1].trim();
+        }
       }
       
-      // If we're processing an Indian Amazon URL, keep it that way
-      let expandedUrl = '';
-      if (url.includes('amzn.in')) {
-        expandedUrl = `https://www.amazon.in/dp/${productId}`;
-      } else {
-        // Default to US Amazon
-        expandedUrl = `https://www.amazon.com/dp/${productId}`;
-      }
-      
+      // Use the appropriate domain
+      const expandedUrl = `https://www.${domain}/dp/${productId}`;
       console.log("Expanded URL:", expandedUrl);
       return expandedUrl;
     }
