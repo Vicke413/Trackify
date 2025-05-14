@@ -106,21 +106,57 @@ async function getProductInfoFromGemini(url: string): Promise<ScrapedProduct | n
   }
 }
 
-// Handle shortened Amazon URLs
+// Handle Amazon URLs
 function expandAmazonUrl(url: string): string {
-  // Handle shortened Amazon URLs like amzn.in
-  if (url.includes('amzn.in') || url.includes('amzn.to')) {
-    // For Amazon shortened URLs, we'll need to construct a fallback URL
-    if (url.includes('/d/')) {
-      const parts = url.split('/d/');
-      if (parts.length > 1) {
-        const productId = parts[1].split('?')[0].split('/')[0];
-        // Return a full Amazon URL based on the product ID
-        return `https://www.amazon.com/dp/${productId}`;
-      }
+  try {
+    console.log("Original URL:", url);
+    
+    // Direct pass-through for full Amazon URLs
+    if (url.includes('amazon.com')) {
+      console.log("Amazon.com URL detected, using as-is");
+      return url;
     }
+    
+    // For shortened URLs like amzn.in/d/PRODUCTID
+    if (url.includes('amzn.in') || url.includes('amzn.to')) {
+      let productId = '';
+      
+      // Pattern like amzn.in/d/abc123
+      if (url.includes('/d/')) {
+        const parts = url.split('/d/');
+        if (parts.length > 1) {
+          productId = parts[1].split('?')[0].split('/')[0].trim();
+          console.log("Extracted product ID from /d/ format:", productId);
+        }
+      } 
+      
+      // If we couldn't extract ID using the /d/ pattern, try another approach
+      if (!productId) {
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
+        productId = pathParts[pathParts.length - 1].trim();
+        console.log("Extracted product ID using pathname:", productId);
+      }
+      
+      // If we're processing an Indian Amazon URL, keep it that way
+      let expandedUrl = '';
+      if (url.includes('amzn.in')) {
+        expandedUrl = `https://www.amazon.in/dp/${productId}`;
+      } else {
+        // Default to US Amazon
+        expandedUrl = `https://www.amazon.com/dp/${productId}`;
+      }
+      
+      console.log("Expanded URL:", expandedUrl);
+      return expandedUrl;
+    }
+    
+    // Return unchanged if it's not an Amazon URL
+    return url;
+  } catch (error) {
+    console.error("Error expanding Amazon URL:", error);
+    return url; // Return original URL if expansion fails
   }
-  return url;
 }
 
 // Simple scraper that attempts to extract data from common e-commerce sites

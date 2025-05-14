@@ -16,7 +16,7 @@ export interface IStorage {
   getProduct(id: number): Promise<Product | undefined>;
   getProductsByUserId(userId: number): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
-  updateProductPrice(id: number, price: number): Promise<Product>;
+  updateProductPrice(id: number, price: number | string): Promise<Product>;
   deleteProduct(id: number): Promise<boolean>;
   
   // Price History Methods
@@ -103,15 +103,18 @@ export class MemStorage implements IStorage {
     return product;
   }
 
-  async updateProductPrice(id: number, price: number): Promise<Product> {
+  async updateProductPrice(id: number, price: number | string): Promise<Product> {
     const product = this.products.get(id);
     if (!product) {
       throw new Error(`Product with id ${id} not found`);
     }
     
+    // Ensure price is stored consistently
+    const priceValue = typeof price === 'string' ? price : price.toString();
+    
     const updatedProduct = { 
       ...product, 
-      currentPrice: price, 
+      currentPrice: priceValue, 
       lastChecked: new Date() 
     };
     this.products.set(id, updatedProduct);
